@@ -1,11 +1,11 @@
-# CUP Srun Campus Network Auto-Auth & WebUI
-### 中国石油大学（北京）校园网 Srun 自动认证与 Web 管理工具
+# CUP Srun Campus Network Auto-Auth for OpenWrt / iStoreOS
+### 中国石油大学（北京）校园网 Srun 自动认证与 LuCI 管理插件
 
 [![OpenWrt](https://img.shields.io/badge/Platform-OpenWrt%20%7C%20iStoreOS-blue.svg)](https://openwrt.org/)
 [![Python](https://img.shields.io/badge/Python-3.x-brightgreen.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-专为部署在 **OpenWrt / iStoreOS** 等软路由与 Linux 网关设备的深澜（Srun3000 / Srun4000）校园网自动登录、后台保活与可视化管理套件。
+专为部署在 **OpenWrt / iStoreOS** 等软路由与 Linux 网关设备的深澜（Srun3000 / Srun4000）校园网自动登录、后台保活与可视化管理插件。
 
 解决校园网频繁掉线、设备数限制、重启软路由无法联网等痛点。全屋设备通过路由器连网，统一走软路由自动认证出网。
 
@@ -13,14 +13,12 @@
 
 ## 🌟 特性一览
 
-- ⚡ **无感自动登录**：开机自动认证，网络掉线或下线后定时任务秒级探测并自动重连。
-- 🖥️ **双前端管理界面**：
-  - **LuCI 界面原生集成**：无缝融入 iStoreOS / OpenWrt 路由器后台（`服务 -> 校园网认证`）。
-  - **独立轻量 WebUI**：监听 `8880` 端口，手机或电脑浏览器直接打开管理，无需暴露路由器 root 密码。
+- ⚡ **无感自动登录**：开机自动认证，网络掉线或注销后定时任务秒级探测并自动重连。
+- 🖥️ **原生 LuCI 界面管理**：无缝融入 iStoreOS / OpenWrt 路由器后台（`服务 -> 校园网认证`），受路由 root 账户保护，安全可靠。
 - 🚪 **全流程生命周期管理**：支持在线状态实时监测、一键立即认证、一键注销下线。
-- ⚙️ **动态配置无需重启**：Web 界面随时修改学号、密码与检测频率，即刻生效写入底层脚本。
+- ⚙️ **动态配置即时生效**：Web 界面随时修改学号、密码与检测频率，即刻生效写入底层脚本。
 - 🛡️ **轻量安全与内存保护**：纯 Python 标准库编写（无需额外 pip 依赖）；内置 500 行日志滚动保护，防止 OpenWrt 内存盘（tmpfs）占满。
-- 📦 **开箱即用一键脚本**：提供一键安装与卸载 Shell 脚本，一键完成开机服务与 Crontab 注册。
+- 📦 **开箱即用一键脚本**：提供一键安装与卸载 Shell 脚本，一键完成 Crontab 定时保活注册与 LuCI 菜单挂载。
 
 ---
 
@@ -51,23 +49,16 @@ chmod +x install.sh
 # 1. 复制核心程序
 mkdir -p /usr/local/bin
 cp bin/srun_auth.py /usr/local/bin/srun_auth.py
-cp bin/srun_webui.py /usr/local/bin/srun_webui.py
-chmod +x /usr/local/bin/srun_auth.py /usr/local/bin/srun_webui.py
+chmod +x /usr/local/bin/srun_auth.py
 
-# 2. 配置 WebUI 开机启动服务
-cp etc/init.d/srun_webui /etc/init.d/srun_webui
-chmod +x /etc/init.d/srun_webui
-/etc/init.d/srun_webui enable
-/etc/init.d/srun_webui start
-
-# 3. 配置 LuCI 界面
+# 2. 部署 LuCI 界面组件
 mkdir -p /usr/lib/lua/luci/controller
 mkdir -p /usr/lib/lua/luci/view/srun
 cp luci/controller/srun.lua /usr/lib/lua/luci/controller/srun.lua
 cp luci/view/srun/index.htm /usr/lib/lua/luci/view/srun/index.htm
 rm -f /tmp/luci-indexcache*
 
-# 4. 配置后台保活定时任务 (每2分钟检测一次)
+# 3. 配置后台保活定时任务 (每2分钟检测一次)
 (crontab -l 2>/dev/null | grep -v "srun_auth.py"; echo "*/2 * * * * /usr/bin/python3 /usr/local/bin/srun_auth.py >/dev/null 2>&1") | crontab -
 /etc/init.d/cron restart
 ```
@@ -76,23 +67,18 @@ rm -f /tmp/luci-indexcache*
 
 ## 📖 使用指南
 
-### 1. 独立 Web 管理端（端口 8880）
-安装完成后，在同一局域网的任意浏览器中访问：
-```text
-http://<路由器IP>:8880
-```
-- **首次使用**：在「⚙️ 账号配置」卡片中输入你的学号与校园网密码，点击「💾 保存配置」。
-- **状态卡片**：查看是否在线、当前分配的内网 IP 与已登录用户名。
-- **手动操作**：点击「🔑 立即认证」直接上线，或「🚪 注销下线」主动断开网络连接。
-
-### 2. LuCI 管理界面
-登录 iStoreOS 后台，左侧导航栏：
+### 1. LuCI 管理界面
+登录 iStoreOS / OpenWrt 路由器后台，点击左侧导航栏：
 ```text
 服务 -> 校园网认证
 ```
-- 提供账号密码编辑、检测保活任务开关、自定义保活时间（1~1440分钟）、实时认证终端日志查看。
+- **状态卡片**：实时显示在线状态、当前分配的内网 IP、已登录用户名。
+- **手动操作**：支持「🔑 立即认证」、「🚪 注销下线」、「🔄 刷新状态」。
+- **账号配置**：输入学号与校园网密码，点击「💾 保存配置」即刻写入底层脚本生效。
+- **定时任务设置**：可开启/关闭后台保活检测，并自定义检测频率（1~1440 分钟）。
+- **实时日志**：一键刷新查看认证与保活日志。
 
-### 3. 命令行（CLI）调试
+### 2. 命令行（CLI）调试
 你也可以直接在 SSH 终端通过命令行与认证核心交互：
 
 ```bash
@@ -120,11 +106,7 @@ tail -f /var/log/srun_auth.log
 ├── install.sh              # 一键自动安装脚本
 ├── uninstall.sh            # 一键完全卸载脚本
 ├── bin/
-│   ├── srun_auth.py        # 认证核心引擎（加解密、保活与状态探测）
-│   └── srun_webui.py       # 独立轻量 WebUI 服务（Port 8880）
-├── etc/
-│   └── init.d/
-│       └── srun_webui      # OpenWrt procd 守护进程与开机自启脚本
+│   └── srun_auth.py        # 认证核心引擎（加解密、保活与状态探测、注销下线）
 ├── luci/
 │   ├── controller/
 │   │   └── srun.lua        # LuCI 路由与后端逻辑控制器
