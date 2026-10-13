@@ -61,10 +61,10 @@ flowchart TD
 
 ```bash
 # 1. 克隆或下载本项目
-git clone https://github.com/YOUR_GITHUB_USERNAME/cup-srun-login.git /tmp/cup-srun-login
+git clone https://github.com/Carton-qin/cup-srun.git /tmp/cup-srun
 
 # 2. 进入目录并执行一键安装
-cd /tmp/cup-srun-login
+cd /tmp/cup-srun
 chmod +x install.sh
 ./install.sh
 ```
