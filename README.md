@@ -24,35 +24,6 @@
 
 ---
 
-## 🏗️ 架构与工作流程
-
-```mermaid
-flowchart TD
-    subgraph 局域网设备
-        A[手机 / PC / 平板] -->|Wi-Fi / LAN| B(iStoreOS / OpenWrt 软路由)
-    end
-
-    subgraph 软路由内部服务
-        B --> C[Crontab 后台定时保活]
-        B --> D[LuCI 路由器管理页]
-        B --> E[独立 WebUI: 8880]
-
-        C -->|每 2 分钟执行| F[srun_auth.py 核心引擎]
-        D -->|AJAX 调用| F
-        E -->|HTTP 调用| F
-    end
-
-    subgraph 校园网网关
-        F -->|1. 状态检测 /rad_user_info| G[Srun Portal 网关]
-        F -->|2. 获取 Token /get_challenge| G
-        F -->|3. 提交登录 /srun_portal| G
-        F -->|4. 主动下线 /srun_portal| G
-        G -->|NAT / 认证放行| H[互联网 Internet]
-    end
-```
-
----
-
 ## 🚀 快速安装部署
 
 ### 方式 1：一键快速安装（推荐）
