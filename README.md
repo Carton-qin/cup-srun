@@ -28,20 +28,18 @@
 
 ### 方式 1：一键快速安装（推荐）
 
-通过 SSH 登录到你的 OpenWrt / iStoreOS 路由器终端，执行以下命令：
+通过 SSH 登录到你的 OpenWrt / iStoreOS 路由器终端，执行以下命令（内置自动下载与环境检测，**无需安装 git**）：
 
 ```bash
-# 1. 克隆或下载本项目
-git clone https://github.com/Carton-qin/cup-srun.git /tmp/cup-srun
-
-# 2. 进入目录并执行一键安装
-cd /tmp/cup-srun
+curl -sLk https://github.com/Carton-qin/cup-srun/archive/refs/heads/main.tar.gz | tar -xz -C /tmp
+cd /tmp/cup-srun-main
 chmod +x install.sh
 ./install.sh
 ```
 
 > [!TIP]
-> 安装脚本会自动检测 `python3` 环境；若缺少将自动通过 `opkg` 安装。
+> - 若你的路由器已自行安装 `git`，也可直接通过 `git clone https://github.com/Carton-qin/cup-srun.git /tmp/cup-srun && cd /tmp/cup-srun && chmod +x install.sh && ./install.sh` 进行安装。
+> - 安装脚本会自动检测 `python3` 环境；若缺少将自动通过 `opkg` 尝试安装。
 
 ---
 
