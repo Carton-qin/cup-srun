@@ -1,0 +1,271 @@
+<%+header%>
+<style>
+:root{--blue:#2563eb;--blue-l:#eff6ff;--green:#16a34a;--green-l:#f0fdf4;
+      --red:#dc2626;--red-l:#fef2f2;--gray:#6b7280;--border:#e5e7eb;--bg:#f9fafb}
+.sr-wrap{max-width:800px;margin:0 auto;display:grid;gap:18px;padding-bottom:24px}
+.sr-card{background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.sr-head{padding:14px 20px;border-bottom:1px solid var(--border);font-weight:600;font-size:15px;
+         display:flex;align-items:center;gap:8px}
+.sr-body{padding:20px}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:20px;
+       font-size:13px;font-weight:500}
+.badge::before{content:'';width:8px;height:8px;border-radius:50%;background:currentColor}
+.badge-on{background:var(--green-l);color:var(--green)}
+.badge-off{background:var(--red-l);color:var(--red)}
+.badge-checking{background:#fef9c3;color:#854d0e}
+.info-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.info-box{background:var(--bg);border-radius:8px;padding:12px 16px}
+.info-box .lbl{font-size:12px;color:var(--gray);margin-bottom:3px}
+.info-box .val{font-size:14px;font-weight:500;font-family:monospace}
+.form-g{margin-bottom:16px}
+.form-g label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--gray)}
+.form-g input[type="text"], .form-g input[type="password"], .form-g input[type="number"]{
+  width:100%;padding:9px 13px;border:1px solid var(--border);border-radius:8px;
+  font-size:14px;outline:none;transition:border .2s;box-sizing:border-box;background:#fff;
+}
+.form-g input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.form-g input[readonly]{background:var(--bg);color:var(--gray)}
+.checkbox-label{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;user-select:none;color:var(--text)}
+.checkbox-label input[type="checkbox"]{width:16px;height:16px;cursor:pointer}
+.btn{padding:9px 18px;border:none;border-radius:8px;font-size:14px;font-weight:500;
+     cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s}
+.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:#1d4ed8}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#15803d}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#b91c1c}
+.tag-btn{padding:4px 10px;font-size:12px;border:1px solid var(--border);border-radius:6px;
+         background:#fff;color:var(--text);cursor:pointer;transition:.15s}
+.tag-btn:hover{background:var(--blue-l);border-color:var(--blue);color:var(--blue)}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap}
+.alert{padding:10px 16px;border-radius:8px;font-size:13px;margin-bottom:14px}
+.alert-ok{background:var(--green-l);color:var(--green);border:1px solid #bbf7d0}
+.alert-err{background:var(--red-l);color:var(--red);border:1px solid #fecaca}
+.log-box{background:#0f172a;color:#94a3b8;font-family:monospace;font-size:12px;
+         padding:14px;border-radius:8px;height:240px;overflow-y:auto;
+         white-space:pre-wrap;word-break:break-all;line-height:1.6}
+.note{font-size:12px;color:var(--gray);margin-top:10px}
+#auth-result{margin-top:12px;display:none}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:560px){.info-row, .grid-2{grid-template-columns:1fr}}
+</style>
+
+<div class="sr-wrap">
+
+<%
+local msg = luci.http.formvalue("msg") or ""
+local cfg = {}
+do
+  local f = io.open("/usr/local/bin/srun_auth.py","r")
+  if f then
+    local c = f:read("*all"); f:close()
+    local u = c:match('USERNAME%s*=%s*"([^"]*)"') or ""
+    local p = c:match('PASSWORD%s*=%s*"([^"]*)"') or ""
+    if u == "YOUR_USERNAME" then u = "" end
+    if p == "YOUR_PASSWORD" then p = "" end
+    cfg.username = u
+    cfg.password = p
+    cfg.server   = c:match('SERVER%s*=%s*"([^"]*)"')   or "https://login.cup.edu.cn"
+  end
+end
+
+-- 读取当前 cron 状态
+local cron_enabled = false
+local cron_interval = 2
+do
+  local f = io.open("/etc/crontabs/root", "r")
+  if f then
+    for line in f:lines() do
+      if line:find("srun_auth%.py") then
+        if not line:match("^%s*#") then
+          cron_enabled = true
+          if line:match("^%* %* %* %* %*") then
+            cron_interval = 1
+          elseif line:match("^0 %* %* %* %*") then
+            cron_interval = 60
+          else
+            local h = line:match("^0 %*/(%d+) %* %* %*")
+            if h then
+              cron_interval = (tonumber(h) or 1) * 60
+            else
+              local n = line:match("^%*/(%d+) %* %* %* %*")
+              if n then cron_interval = tonumber(n) or 2 end
+            end
+          end
+        end
+      end
+    end
+    f:close()
+  end
+end
+%>
+
+<!-- 状态卡 -->
+<div class="sr-card">
+  <div class="sr-head">📡 当前状态</div>
+  <div class="sr-body">
+    <span id="badge" class="badge badge-checking">检测中...</span>
+    <div class="info-row">
+      <div class="info-box"><div class="lbl">登录账号</div><div class="val" id="s-user">—</div></div>
+      <div class="info-box"><div class="lbl">IP 地址</div><div class="val" id="s-ip">—</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- 手动操作 -->
+<div class="sr-card">
+  <div class="sr-head">⚡ 手动操作</div>
+  <div class="sr-body">
+    <div id="auth-result"></div>
+    <div class="btn-row">
+      <button class="btn btn-green" onclick="doAuth()">🔑 立即认证</button>
+      <button class="btn btn-red" onclick="doLogout()">🚪 注销下线</button>
+      <button class="btn btn-blue" onclick="checkStatus()">🔄 刷新状态</button>
+    </div>
+    <p class="note">
+      <% if cron_enabled then %>
+        ⏱️ 定时任务：<strong>每 <%=cron_interval%> 分钟</strong> 自动检测，断线即重连
+      <% else %>
+        ⚠️ 定时任务：<strong>已关闭自动检测</strong>
+      <% end %>
+    </p>
+  </div>
+</div>
+
+<!-- 配置表单 -->
+<div class="sr-card">
+  <div class="sr-head">⚙️ 账号与自动检测配置</div>
+  <div class="sr-body">
+    <% if msg == "saved" then %><div class="alert alert-ok">✅ 配置已成功保存并立即生效</div><% end %>
+    <% if msg == "error" then %><div class="alert alert-err">❌ 保存失败，请检查脚本文件</div><% end %>
+    <form method="post" action="<%=luci.dispatcher.build_url("admin","services","srun","save")%>">
+      <div class="form-g">
+        <label>学号 / 用户名</label>
+        <input type="text" name="username" value="<%=luci.util.pcdata(cfg.username)%>" placeholder="请输入学号" autocomplete="off" required>
+      </div>
+      <div class="form-g">
+        <label>校园网密码</label>
+        <input type="password" name="password" value="<%=luci.util.pcdata(cfg.password)%>" placeholder="请输入密码" required>
+      </div>
+      <div class="form-g">
+        <label>认证服务器</label>
+        <input type="text" value="<%=luci.util.pcdata(cfg.server)%>" readonly>
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:20px 0 16px 0;">
+
+      <div class="grid-2">
+        <div class="form-g">
+          <label>自动重连任务</label>
+          <div style="padding-top:8px;">
+            <label class="checkbox-label">
+              <input type="checkbox" name="cron_enable" value="1" <%=cron_enabled and 'checked="checked"' or ''%>>
+              开启后台定时检测与自动保活
+            </label>
+          </div>
+        </div>
+        <div class="form-g">
+          <label>自定义检测时间间隔（分钟）</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="number" id="cron_input" name="cron_interval" min="1" max="1440" value="<%=cron_interval%>" style="max-width:110px;">
+            <span style="font-size:13px;color:var(--gray)">分钟</span>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:6px;">
+              <button type="button" class="tag-btn" onclick="setIntervalVal(1)">1分</button>
+              <button type="button" class="tag-btn" onclick="setIntervalVal(2)">2分</button>
+              <button type="button" class="tag-btn" onclick="setIntervalVal(5)">5分</button>
+              <button type="button" class="tag-btn" onclick="setIntervalVal(10)">10分</button>
+              <button type="button" class="tag-btn" onclick="setIntervalVal(30)">30分</button>
+              <button type="button" class="tag-btn" onclick="setIntervalVal(60)">1小时</button>
+            </div>
+          </div>
+          <p class="note" style="margin-top:6px;">💡 可直接手动输入任意正整数分钟（1 ~ 1440 分钟）</p>
+        </div>
+      </div>
+
+      <div class="btn-row" style="margin-top:12px;">
+        <button class="btn btn-blue" type="submit">💾 保存配置</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 日志 -->
+<div class="sr-card">
+  <div class="sr-head">📋 认证日志
+    <button class="btn btn-blue" style="margin-left:auto;padding:4px 10px;font-size:12px" onclick="loadLog()">刷新日志</button>
+  </div>
+  <div class="sr-body">
+    <div class="log-box" id="log-box">加载中...</div>
+  </div>
+</div>
+
+</div>
+
+<script>
+var BASE = "<%=luci.dispatcher.build_url("admin","services","srun")%>";
+
+function setIntervalVal(val){
+  var inp = document.getElementById("cron_input");
+  if(inp){ inp.value = val; }
+}
+
+function checkStatus(){
+  var b=document.getElementById("badge");
+  b.className="badge badge-checking"; b.textContent="检测中...";
+  fetch(BASE+"/status").then(r=>r.json()).then(function(d){
+    if(d.online){
+      b.className="badge badge-on"; b.textContent="已认证在线";
+      document.getElementById("s-user").textContent=d.username||"—";
+      document.getElementById("s-ip").textContent=d.ip||"—";
+    } else {
+      b.className="badge badge-off"; b.textContent="未认证 / 离线";
+      document.getElementById("s-user").textContent="—";
+      document.getElementById("s-ip").textContent="—";
+    }
+  }).catch(function(){
+    b.className="badge badge-off"; b.textContent="检测失败";
+  });
+}
+
+function doAuth(){
+  var div=document.getElementById("auth-result");
+  div.style.display="block";
+  div.className="alert"; div.textContent="认证请求中...";
+  fetch(BASE+"/do_auth").then(r=>r.json()).then(function(d){
+    var ok=d.result&&(d.result.indexOf("成功")>=0||d.result.toLowerCase().indexOf("ok")>=0);
+    div.className="alert "+(ok?"alert-ok":"alert-err");
+    div.textContent=ok?"✅ "+d.result:"⚠️ "+d.result;
+    checkStatus();
+    loadLog();
+  }).catch(function(e){
+    div.className="alert alert-err"; div.textContent="请求失败: "+e;
+  });
+}
+
+function doLogout(){
+  if(!confirm("确定要注销下线当前校园网连接吗？")) return;
+  var div=document.getElementById("auth-result");
+  div.style.display="block";
+  div.className="alert"; div.textContent="注销请求中...";
+  fetch(BASE+"/do_logout").then(r=>r.json()).then(function(d){
+    var ok=d.result&&(d.result.indexOf("成功")>=0||d.result.toLowerCase().indexOf("ok")>=0);
+    div.className="alert "+(ok?"alert-ok":"alert-err");
+    div.textContent=ok?"✅ "+d.result:"⚠️ "+d.result;
+    checkStatus();
+    loadLog();
+  }).catch(function(e){
+    div.className="alert alert-err"; div.textContent="请求失败: "+e;
+  });
+}
+
+function loadLog(){
+  fetch(BASE+"/log").then(r=>r.text()).then(function(t){
+    var box=document.getElementById("log-box");
+    box.textContent=t||"（暂无日志）";
+    box.scrollTop=box.scrollHeight;
+  });
+}
+
+checkStatus();
+loadLog();
+setInterval(checkStatus, 30000);
+</script>
+<%+footer%>
